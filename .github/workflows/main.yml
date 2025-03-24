@@ -2,7 +2,8 @@ name: cron job
 on:
   schedule:
     - cron: '*/5 * * * *'
-
+  workflow_dispatch:
+  
 jobs:
   cron_job:
     runs-on: ubuntu-latest
