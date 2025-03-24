@@ -11,9 +11,7 @@ load_dotenv(override=True)
 auth_url = "https://www.strava.com/oauth/token"
 epoch = time.time()
 
-latest_keys = pl.read_database_uri(
-    query="select * from oauth_keys order by id desc limit 1",
-    uri=os.getenv("SUPABASE_URI"))
+latest_keys = pl.read_database_uri(query="select * from oauth_keys order by id desc limit 1", uri=os.getenv("SUPABASE_URI"))
 
 expires_at = latest_keys["expires_at"][0]
 
