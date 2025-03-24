@@ -6,6 +6,7 @@ on:
   
 jobs:
   cron_job:
+    environment: auth_tokens
     runs-on: ubuntu-latest
 
     steps:
