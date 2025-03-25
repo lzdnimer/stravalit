@@ -1,39 +1,53 @@
-# activities_url = "https://www.strava.com/api/v3/athlete/activities"
-# header = {'Authorization': 'Bearer ' + "1ee76f66acdb7b2f1538053542f18f92e03406dc"}
-# param = {'per_page': 200, 'page': 1}
-# my_dataset = requests.get(activities_url, headers=header, params=param).json()
+from dotenv import load_dotenv
+import requests
+import os
+import urllib3
+from datetime import datetime
+import polars as pl
+from polars import col
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+load_dotenv(override=True)
 
+latest_keys = pl.read_database_uri(query="select * from oauth_keys order by id desc limit 1", uri=os.getenv("SUPABASE_URI"))
+access_key = latest_keys["access_token"][0]
+activities_url = "https://www.strava.com/api/v3/athlete/activities"
+header = {'Authorization': 'Bearer ' + access_key}
+param = {'per_page': 10, 'page': 1}
+strava = requests.get(activities_url, headers=header, params=param).json()
 
-# The first loop, request_page_number will be set to one, so it requests the first page. Increment this number after
-# # each request, so the next time we request the second page, then third, and so on...
-# request_page_num = 1
-# all_activities = []
+# most recent activities from strava
+api_activities = pl.DataFrame(strava).select([
+    col("id").alias("activity_id"),
+    "start_date_local",
+    col("name").alias("activity_name"),
+    "distance",
+    "moving_time",
+    "elapsed_time",
+    "total_elevation_gain",
+    col("type").alias("activity_type"),
+    "kudos_count",
+    "comment_count",
+    "photo_count",
+    "average_speed",
+    "max_speed",
+    "average_heartrate",
+    "max_heartrate",
+    "elev_high",
+    "elev_low"
+    ]).with_columns(
+        col("distance").cast(pl.Float32) / 1000,
+        col("start_date_local").cast(pl.Datetime).cast(pl.Date),
+        ).filter((col("start_date_local") >= datetime(2025, 1, 1))).sort("start_date_local")
 
-# while True:
-#     param = {'per_page': 200, 'page': request_page_num}
-#     # initial request, where we request the first page of activities
-#     my_dataset = requests.get(activites_url, headers=header, params=param).json()
+# ran once to add initial data into table 
+# df.write_database(table_name="activities",  connection=os.getenv("SUPABASE_URI"), if_table_exists="append")
 
-#     # check the response to make sure it is not empty. If it is empty, that means there is no more data left. So if you have
-#     # 1000 activities, on the 6th request, where we request page 6, there would be no more data left, so we will break out of the loop
-#     if len(my_dataset) == 0:
-#         print("breaking out of while loop because the response is zero, which means there must be no more activities")
-#         break
+db_activities = pl.read_database_uri(query="select * from activities order by start_date_local", uri=os.getenv("SUPABASE_URI"))
 
-#     # if the all_activities list is already populated, that means we want to add additional data to it via extend.
-#     if all_activities:
-#         print("all_activities is populated")
-#         all_activities.extend(my_dataset)
+# performing an anti join on the data from Strava's API and the data from Supabase
+delta_activities = api_activities.join(db_activities, on="activity_id", how="anti")
 
-#     # if the all_activities is empty, this is the first time adding data so we just set it equal to my_dataset
-#     else:
-#         print("all_activities is NOT populated")
-#         all_activities = my_dataset
+if len(delta_activities) != 0:
+    delta_activities.write_database(table_name="activities", connection=os.getenv("SUPABASE_URI"), if_table_exists="append")
 
-#     request_page_num += 1
-
-# print(len(all_activities))
-# for count, activity in enumerate(all_activities):
-#     print(activity["name"])
-#     print(count)
