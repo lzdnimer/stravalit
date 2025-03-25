@@ -18,13 +18,13 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: py script secrets check
+      - name: run py script
         env:
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
           SUPABASE_URI: ${{ secrets.SUPABASE_URI }}
         run: |
-          python strava-keys.py
+          python strava-activities.py
           
           
 
