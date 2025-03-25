@@ -14,7 +14,6 @@ load_dotenv(override=True)
 epoch = time.time()
 latest_keys = pl.read_database_uri(query="select * from oauth_keys order by id desc limit 1", uri=os.getenv("SUPABASE_URI"))
 expires_at = latest_keys["expires_at"][0]
-access_key = latest_keys["access_token"][0]
 auth_url = "https://www.strava.com/oauth/token"
 
 if epoch > expires_at:
@@ -39,6 +38,7 @@ if epoch > expires_at:
 # get the most recent 10 activities from Strava, and update the database with any new activities
 # I requested 10 only because the cron job runs every 15 minutes anyways
 activities_url = "https://www.strava.com/api/v3/athlete/activities"
+access_key = latest_keys["access_token"][0]
 header = {'Authorization': 'Bearer ' + access_key}
 param = {'per_page': 10, 'page': 1}
 strava = requests.get(activities_url, headers=header, params=param).json()
