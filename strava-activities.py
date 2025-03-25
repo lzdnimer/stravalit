@@ -1,22 +1,47 @@
-from dotenv import load_dotenv
 import requests
 import os
 import urllib3
-from datetime import datetime
+import time
 import polars as pl
+from dotenv import load_dotenv
+from datetime import datetime
 from polars import col
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 load_dotenv(override=True)
 
+# if the access key has expired, run the strava_keys script to get a new one
+epoch = time.time()
 latest_keys = pl.read_database_uri(query="select * from oauth_keys order by id desc limit 1", uri=os.getenv("SUPABASE_URI"))
+expires_at = latest_keys["expires_at"][0]
 access_key = latest_keys["access_token"][0]
+auth_url = "https://www.strava.com/oauth/token"
+
+if epoch > expires_at:
+    refresh_token = latest_keys["refresh_token"][0]
+    payload = {
+        'client_id': os.getenv("CLIENT_ID"),
+        'client_secret': os.getenv("CLIENT_SECRET"),
+        'refresh_token': refresh_token,
+        'grant_type': "refresh_token",
+        'f': 'json'
+    }
+
+    refresh_req = requests.post(auth_url, data=payload, verify=False).json()
+    df = pl.DataFrame(
+        {"access_token": refresh_req["access_token"],
+        "refresh_token": refresh_req["refresh_token"],
+        "expires_at": refresh_req["expires_at"]
+        })
+    
+    df.write_database(table_name="oauth_keys",  connection=os.getenv("SUPABASE_URI"), if_table_exists="append")
+
+# get the most recent 10 activities from Strava, and update the database with any new activities
+# I requested 10 only because the cron job runs every 15 minutes anyways
 activities_url = "https://www.strava.com/api/v3/athlete/activities"
 header = {'Authorization': 'Bearer ' + access_key}
 param = {'per_page': 10, 'page': 1}
 strava = requests.get(activities_url, headers=header, params=param).json()
-
-# most recent activities from strava
 api_activities = pl.DataFrame(strava).select([
     col("id").alias("activity_id"),
     "start_date_local",
@@ -50,4 +75,3 @@ delta_activities = api_activities.join(db_activities, on="activity_id", how="ant
 
 if len(delta_activities) != 0:
     delta_activities.write_database(table_name="activities", connection=os.getenv("SUPABASE_URI"), if_table_exists="append")
-
