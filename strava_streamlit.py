@@ -23,7 +23,7 @@ st.set_page_config(page_title="strava anti-stats", layout="wide")
 
 left_img, mid_img, right_img = st.columns(3)
 with mid_img:
-    st.image("/home/lazaro/stravalit/strava-anti-stats-25-03-2025.png")
+    st.image("strava-anti-stats-25-03-2025.png")
 
 left_ttl, mid_ttl, right_ttl = st.columns([0.1,0.7,0.1], vertical_alignment="center")
 with mid_ttl:
