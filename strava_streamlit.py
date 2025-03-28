@@ -13,12 +13,19 @@ from polars import col
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 load_dotenv(override=True)
 
-db_df = pl.read_database_uri(query="select * from activities order by start_date_local", uri=os.getenv("SUPABASE_URI"))
+query="" \
+"select a.*, i.kudos_count, i.comment_count " \
+"from activities a " \
+"left join interactions i on a.activity_id = i.activity_id " \
+"order by a.start_date_local"
+
+db_df = pl.read_database_uri(
+    query=query, uri=os.getenv("SUPABASE_URI"))
 
 df = db_df.select("*").with_columns(
     cumulative_elevation_gain=pl.col("total_elevation_gain").cum_sum())
 
-# streamlit app design
+streamlit app design
 st.set_page_config(page_title="strava anti-stats", layout="wide")
 
 left_img, mid_img, right_img = st.columns(3)
@@ -101,4 +108,4 @@ with lcol1:
     st.scatter_chart(kudos_chart, x="distance", y="kudos_count", color="#FC5200", height=500)
 
 
-# elapsed time vs moving time
+# # elapsed time vs moving time
