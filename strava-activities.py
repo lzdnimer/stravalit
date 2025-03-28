@@ -82,33 +82,19 @@ interactions = pl.DataFrame(strava).select([
 
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 interactions_json = interactions.write_json()
-
 response = supabase.table("interactions").upsert(interactions_json, on_conflict=["activity_id"]).execute()
 
 # ran once to add initial data into interactions table 
 # interactions.write_database(table_name="interactions",  connection=os.getenv("SUPABASE_URI"), if_table_exists="replace")
 
-# need to add supabase key to envs (github actions and streamlit)
 
+# performing an anti join on the data from Strava's API and the data from Supabase
+db_activities = pl.read_database_uri(query="select * from activities order by start_date_local", uri=os.getenv("SUPABASE_URI"))
+delta_activities = latest_activities.join(db_activities, on="activity_id", how="anti")
+if len(delta_activities) != 0:
+    delta_activities.write_database(table_name="activities", connection=os.getenv("SUPABASE_URI"), if_table_exists="append")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# db_activities = pl.read_database_uri(query="select * from activities order by start_date_local", uri=os.getenv("SUPABASE_URI"))
-
-# # performing an anti join on the data from Strava's API and the data from Supabase
-# delta_activities = api_activities.join(db_activities, on="activity_id", how="anti")
-
-# if len(delta_activities) != 0:
-#     delta_activities.write_database(table_name="activities", connection=os.getenv("SUPABASE_URI"), if_table_exists="append")
+db_interactions = pl.read_database_uri(query="select * from interactions order by start_date_local", uri=os.getenv("SUPABASE_URI"))
+delta_interactions = interactions.join(db_interactions, on="activity_id", how="anti")
+if len(delta_interactions) != 0:
+    delta_activities.write_database(table_name="activities", connection=os.getenv("SUPABASE_URI"), if_table_exists="append")
