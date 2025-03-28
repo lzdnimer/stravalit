@@ -13,20 +13,23 @@ from polars import col
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 load_dotenv(override=True)
 
+# streamlit app design
+st.set_page_config(page_title="strava anti-stats", layout="wide")
+
 query="" \
 "select a.*, i.kudos_count, i.comment_count " \
 "from activities a " \
 "left join interactions i on a.activity_id = i.activity_id " \
 "order by a.start_date_local"
 
-db_df = pl.read_database_uri(
+@st.cache_data
+def get_db_data():
+    db_df = pl.read_database_uri(
     query=query, uri=os.getenv("SUPABASE_URI"))
+    return db_df
 
-df = db_df.select("*").with_columns(
+df = get_db_data().select("*").with_columns(
     cumulative_elevation_gain=pl.col("total_elevation_gain").cum_sum())
-
-# streamlit app design
-st.set_page_config(page_title="strava anti-stats", layout="wide")
 
 left_img, mid_img, right_img = st.columns(3)
 with mid_img:
@@ -40,9 +43,11 @@ st.divider()
 
 left_sub, right_sub = st.columns([0.7,0.3], vertical_alignment="center")
 with left_sub:
-    st.caption("""### Made by Lazaro Nimer: funemployed [hobby jogger](https://www.strava.com/athletes/25016671) and [data analyst](https://github.com/lzdnimer)""")
+    st.caption("""### Made by Lazaro Nimer: funemployed [hobby jogger](https://www.strava.com/athletes/25016671) and [sql monkey](https://github.com/lzdnimer)""")
 
-st.markdown("#### *VO2 Max. Lactate threshold. Relative Effort.* If you've succumbed to the pressure of running _(thanks, social media!)_, it's likely you've spent a fair amount of time on Strava looking at all the fancy data linked to your activities. While it's useful, I want to do the opposite - how _useless_ could my analysis be?")
+st.markdown("##### *VO2 Max. Lactate Threshold. Relative Effort.* If you've succumbed to the pressure of running _(thanks, social media!)_, it's likely you've spent a fair amount of time on Strava browsing the fancy charts and analyses linked to your activities. While it's useful, I wanted to see how _useless_ my analysis could be.")
+st.markdown("##### I analysed my data using [Strava's API](https://developers.strava.com/docs/reference/) to create _anti-stats_ - statistics that bear no relevance on athlete performance. Sure, VO2 Max may predict your race times, but wouldn't you want to know how to get more kudos instead?")
+
 
 st.divider()
 
@@ -63,7 +68,7 @@ with lcol:
 with rcol:
     with st.container():
 
-        st.metric(label="total (metres)", value=cumu_max, border=True)
+        st.metric(label="total (metres)", value=round(cumu_max,2), border=True)
 
         met1, met2, met3 = st.columns(3)
         with met1:
@@ -84,7 +89,7 @@ with rcol1:
     with met4:
         acti_list = ["Run", "Hike", "Walk"]
         acti_selection = st.pills("activity", acti_list, selection_mode="multi", label_visibility="collapsed", default="Run")
-        kudos_chart = db_df.filter(pl.col("activity_type").is_in(acti_selection))
+        kudos_chart = get_db_data().filter(pl.col("activity_type").is_in(acti_selection))
     with met5:
         total_kudos = df.select(col("kudos_count").sum())
         last_kudos = df.sql("select kudos_count from self order by start_date_local desc limit 1")
@@ -101,11 +106,14 @@ with rcol1:
             delta_colour = "normal"
         
         st.metric(label="most recent activity kudos", value=today_kudos, delta=delta, delta_color=delta_colour, border=True)
-        
-    
-    st.markdown("(description of chart)")
+            
+    corr = get_db_data().select(pl.corr("distance", "kudos_count", method="pearson"))["distance"][0]
+    st.markdown(f"This scatter chart plots activities along with the kudos received for each activity. The activity type is filtered to running, walking, and hiking. If you aren't on Strava (good for you!), think of kudos as a 'like' on a post.")
+    st.markdown(f"Crucially, this plot shows a generally positive relationship between the distance I ran/walked/hiked and the number of kudos received for each post, with a Pearson's correlation coefficient of `{round(corr,2)}`. As kudos is an important social currency in today's society, I intend to run a marathon every day to boost the number of kudos I have.")
+
 with lcol1:
     st.scatter_chart(kudos_chart, x="distance", y="kudos_count", color="#FC5200", height=500)
 
+st.markdown("## elapsed time vs. moving time")
 
 # # elapsed time vs moving time
