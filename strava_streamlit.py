@@ -25,7 +25,7 @@ db_df = pl.read_database_uri(
 df = db_df.select("*").with_columns(
     cumulative_elevation_gain=pl.col("total_elevation_gain").cum_sum())
 
-streamlit app design
+# streamlit app design
 st.set_page_config(page_title="strava anti-stats", layout="wide")
 
 left_img, mid_img, right_img = st.columns(3)
