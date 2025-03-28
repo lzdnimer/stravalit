@@ -100,6 +100,5 @@ with rcol1:
 with lcol1:
     st.scatter_chart(kudos_chart, x="distance", y="kudos_count", color="#FC5200", height=500)
 
-#kudos chart metrics - total kudos - kudos on most recent activity (^ delta)
 
 # elapsed time vs moving time

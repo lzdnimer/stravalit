@@ -3,9 +3,11 @@ import os
 import urllib3
 import time
 import polars as pl
+import streamlit as st
 from dotenv import load_dotenv
 from datetime import datetime
 from polars import col
+from supabase import create_client
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 load_dotenv(override=True)
@@ -34,15 +36,17 @@ if epoch > expires_at:
         })
     
     df.write_database(table_name="oauth_keys",  connection=os.getenv("SUPABASE_URI"), if_table_exists="append")
+    latest_keys = pl.read_database_uri(query="select * from oauth_keys order by id desc limit 1", uri=os.getenv("SUPABASE_URI"))
+    access_key = latest_keys["access_token"][0]
 
 # get the most recent 10 activities from Strava, and update the database with any new activities
 # I requested 10 only because the cron job runs every 15 minutes anyways
 activities_url = "https://www.strava.com/api/v3/athlete/activities"
 access_key = latest_keys["access_token"][0]
 header = {'Authorization': 'Bearer ' + access_key}
-param = {'per_page': 10, 'page': 1}
+param = {'per_page': 200, 'page': 1}
 strava = requests.get(activities_url, headers=header, params=param).json()
-api_activities = pl.DataFrame(strava).select([
+latest_activities = pl.DataFrame(strava).select([
     col("id").alias("activity_id"),
     "start_date_local",
     col("name").alias("activity_name"),
@@ -51,9 +55,6 @@ api_activities = pl.DataFrame(strava).select([
     "elapsed_time",
     "total_elevation_gain",
     col("type").alias("activity_type"),
-    "kudos_count",
-    "comment_count",
-    "photo_count",
     "average_speed",
     "max_speed",
     "average_heartrate",
@@ -65,13 +66,49 @@ api_activities = pl.DataFrame(strava).select([
         col("start_date_local").cast(pl.Datetime).cast(pl.Date),
         ).filter((col("start_date_local") >= datetime(2025, 1, 1))).sort("start_date_local")
 
-# ran once to add initial data into table 
-# df.write_database(table_name="activities",  connection=os.getenv("SUPABASE_URI"), if_table_exists="append")
+# ran once to add initial data into activities table 
+# latest_activities.write_database(table_name="activities",  connection=os.getenv("SUPABASE_URI"), if_table_exists="replace")
 
-db_activities = pl.read_database_uri(query="select * from activities order by start_date_local", uri=os.getenv("SUPABASE_URI"))
+# I want the activites table to be static, with the interactions table dynamic as kudos/comments/photos count may change over time
+interactions = pl.DataFrame(strava).select([
+    col("id").alias("activity_id"),
+    "start_date_local",
+    "kudos_count",
+    "comment_count",
+    ]).with_columns(
+        col("start_date_local").cast(pl.Datetime).cast(pl.Date),
+        last_update=datetime.now()
+            ).filter((col("start_date_local") >= datetime(2025, 1, 1))).sort("start_date_local")
 
-# performing an anti join on the data from Strava's API and the data from Supabase
-delta_activities = api_activities.join(db_activities, on="activity_id", how="anti")
+supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+interactions_json = interactions.write_json()
 
-if len(delta_activities) != 0:
-    delta_activities.write_database(table_name="activities", connection=os.getenv("SUPABASE_URI"), if_table_exists="append")
+response = supabase.table("interactions").upsert(interactions_json, on_conflict=["activity_id"]).execute()
+
+# ran once to add initial data into interactions table 
+# interactions.write_database(table_name="interactions",  connection=os.getenv("SUPABASE_URI"), if_table_exists="replace")
+
+# need to add supabase key to envs (github actions and streamlit)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# db_activities = pl.read_database_uri(query="select * from activities order by start_date_local", uri=os.getenv("SUPABASE_URI"))
+
+# # performing an anti join on the data from Strava's API and the data from Supabase
+# delta_activities = api_activities.join(db_activities, on="activity_id", how="anti")
+
+# if len(delta_activities) != 0:
+#     delta_activities.write_database(table_name="activities", connection=os.getenv("SUPABASE_URI"), if_table_exists="append")
