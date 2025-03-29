@@ -48,7 +48,6 @@ with left_sub:
 st.markdown("##### *VO2 Max. Lactate Threshold. Relative Effort.* If you've succumbed to the pressure of running _(thanks, social media!)_, it's likely you've spent a fair amount of time on Strava browsing the fancy charts and analyses linked to your activities. While it's useful, I wanted to see how _useless_ my analysis could be.")
 st.markdown("##### I analysed my data using [Strava's API](https://developers.strava.com/docs/reference/) to create _anti-stats_ - statistics that bear no relevance on athlete performance. Sure, VO2 Max may predict your race times, but wouldn't you want to know how to get more kudos instead?")
 
-
 st.divider()
 
 st.markdown("## cumulative gain - all activities")
