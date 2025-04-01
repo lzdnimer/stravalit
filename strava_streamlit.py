@@ -29,7 +29,8 @@ def get_db_data():
     return db_df
 
 df = get_db_data().select("*").with_columns(
-    cumulative_elevation_gain=pl.col("total_elevation_gain").cum_sum())
+    cumulative_elevation_gain=pl.col("total_elevation_gain").cum_sum(),
+    month_name=col("start_date_local").dt.strftime("%B"))
 
 left_img, mid_img, right_img = st.columns(3)
 with mid_img:
@@ -113,6 +114,31 @@ with rcol1:
 with lcol1:
     st.scatter_chart(kudos_chart, x="distance", y="kudos_count", color="#FC5200", height=500)
 
-st.markdown("## elapsed time vs. moving time")
+lcol2, rcol2 = st.columns(2)
+with lcol2:
+    st.markdown("## elapsed time vs. moving time")
+    st.container(height=8, border=False)
+    ddf = df.select(col("start_date_local"),col("elapsed_time"), col("moving_time"), col("month_name")
+        ).with_columns(standing_time=col("elapsed_time")-col("moving_time")
+        ).group_by(col("start_date_local").dt.month()).agg(col("elapsed_time").sum(), col("moving_time").sum(), col("standing_time").sum(), col("month_name").max()
+        ).sort("start_date_local")
+    
+    ch = pl.DataFrame(ddf).unpivot(on=['moving_time', 'standing_time'], index=['month_name', "start_date_local"]).sort(by="variable", descending=True
+        ).with_columns(pl.when(col("variable")=="standing_time").then(pl.lit("No")).otherwise(pl.lit("Yes")).alias("Moving"))
 
-# # elapsed time vs moving time
+    bar = alt.Chart(ch
+        ).mark_bar().encode(
+            alt.Y('month_name:N').sort(field='start_date_local').title("Month"),
+            alt.X('value:Q').stack("normalize").title("% of time spent moving/not moving"),
+            alt.Color('Moving:N', scale=alt.Scale(domain=['Yes', 'No'], range=['#ffcbb5', '#fc4c02'])),
+            alt.Order('Moving:N'),
+        ).properties(height=200
+        ).configure_axis(labelFontSize=14, titleFontSize=14).configure_title(fontSize=14).configure_legend(labelFontSize=14, titleFontSize=14)  # Increase legend text size
+
+    st.altair_chart(bar)
+
+    st.markdown(f"If you thought that Strava was an app that just measured your activities, you would be foolish and wrong, as it also tracks your _inactivities_. This bar chart represents the proportion of time I have spent each month moving/not moving, whilst recording an activity.") 
+    st.markdown(f"This is also known as 'moving time' and 'elapsed time' - the time you say you ran that new super-fast PB, and the actual time you ran it.")
+
+with rcol2:
+    st.markdown("## total distance ran")
