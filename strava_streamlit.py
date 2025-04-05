@@ -30,7 +30,7 @@ def get_db_data():
 
 df = get_db_data().select("*").with_columns(
     cumulative_elevation_gain=pl.col("total_elevation_gain").cum_sum(),
-    month_name=col("start_date_local").dt.strftime("%B"))
+    month=col("start_date_local").dt.strftime("%B"))
 
 left_img, mid_img, right_img = st.columns(3)
 with mid_img:
@@ -109,7 +109,7 @@ with rcol1:
             
     corr = get_db_data().select(pl.corr("distance", "kudos_count", method="pearson"))["distance"][0]
     st.markdown(f"This scatter chart plots activities along with the kudos received for each activity. The activity type is filtered to running, walking, and hiking. If you aren't on Strava (good for you!), think of kudos as a 'like' on a post.")
-    st.markdown(f"Crucially, this plot shows a generally positive relationship between the distance I ran/walked/hiked and the number of kudos received for each post, with a Pearson's correlation coefficient of `{round(corr,2)}`. As kudos is an important social currency in today's society, I intend to run a marathon every day to boost the number of kudos I have.")
+    st.markdown(f"Crucially, this plot shows a relationship between the distance I ran/walked/hiked and the number of kudos received for each post, with a Pearson's correlation coefficient of `{round(corr,2)}`. As kudos is an important social currency in today's society, I intend to run a marathon every day to boost the number of kudos I have.")
 
 with lcol1:
     st.scatter_chart(kudos_chart, x="distance", y="kudos_count", color="#FC5200", height=500)
@@ -118,21 +118,21 @@ lcol2, rcol2 = st.columns(2)
 with lcol2:
     st.markdown("## elapsed time vs. moving time")
     st.container(height=8, border=False)
-    ddf = df.select(col("start_date_local"),col("elapsed_time"), col("moving_time"), col("month_name")
+    ddf = df.select(col("start_date_local"),col("elapsed_time"), col("moving_time"), col("month")
         ).with_columns(standing_time=col("elapsed_time")-col("moving_time")
-        ).group_by(col("start_date_local").dt.month()).agg(col("elapsed_time").sum(), col("moving_time").sum(), col("standing_time").sum(), col("month_name").max()
+        ).group_by(col("start_date_local").dt.month()).agg(col("elapsed_time").sum(), col("moving_time").sum(), col("standing_time").sum(), col("month").max()
         ).sort("start_date_local")
     
-    ch = pl.DataFrame(ddf).unpivot(on=['moving_time', 'standing_time'], index=['month_name', "start_date_local"]).sort(by="variable", descending=True
+    ch = pl.DataFrame(ddf).unpivot(on=['moving_time', 'standing_time'], index=['month', "start_date_local"]).sort(by="variable", descending=True
         ).with_columns(pl.when(col("variable")=="standing_time").then(pl.lit("No")).otherwise(pl.lit("Yes")).alias("Moving"))
 
     bar = alt.Chart(ch
         ).mark_bar().encode(
-            alt.Y('month_name:N').sort(field='start_date_local').title("Month"),
+            alt.Y('month:N').sort(field='start_date_local').title("Month"),
             alt.X('value:Q').stack("normalize").title("% of time spent moving/not moving"),
             alt.Color('Moving:N', scale=alt.Scale(domain=['Yes', 'No'], range=['#ffcbb5', '#fc4c02'])),
             alt.Order('Moving:N'),
-        ).properties(height=200
+        ).properties(height=250
         ).configure_axis(labelFontSize=14, titleFontSize=14).configure_title(fontSize=14).configure_legend(labelFontSize=14, titleFontSize=14)  # Increase legend text size
 
     st.altair_chart(bar)
@@ -141,4 +141,19 @@ with lcol2:
     st.markdown(f"This is also known as 'moving time' and 'elapsed time' - the time you say you ran that new super-fast PB, and the actual time you ran it.")
 
 with rcol2:
-    st.markdown("## total distance ran")
+    st.markdown("## weekly volume - rolling window")
+    run = df.select(col("distance"), col("start_date_local"), col("activity_type")).with_columns(rolling_volume_7day=pl.col("distance").rolling_sum(7).round(2)).filter((col("activity_type")=="Run") & (col("rolling_volume_7day").is_not_null()))
+    st.line_chart(
+        data=run,
+        x="start_date_local",
+        x_label="date",
+        y="rolling_volume_7day",
+        y_label="weekly volume (rolling window)",
+        height=250,
+        color="#fc4c02"
+    )
+
+    st.container(height=9, border=False)
+    st.markdown(f"If you thought that Strava was an app that just measured your activities, you would be foolish and wrong, as it also tracks your _inactivities_. This bar chart represents the proportion of time I have spent each month moving/not moving, whilst recording an activity.") 
+
+

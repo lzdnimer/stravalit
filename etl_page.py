@@ -1,3 +1,5 @@
 import streamlit as st
 
-st.write("etl")
+st.markdown("# Strava Anti-Stats")
+
+st.image("strava_etl.png")
