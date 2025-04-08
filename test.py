@@ -58,7 +58,7 @@ bar = alt.Chart(ch).mark_bar().encode(
 
 wk = df.filter(col("activity_type")=="Run").select(col("distance").round(0), col("start_date_local")).group_by(col("start_date_local")).agg(col("distance").sum()).with_columns(weekday=col("start_date_local").dt.strftime("%A"), weekday_num=col("start_date_local").dt.day())
 
-print(wk)
+# print(wk)
 
 box = alt.Chart(wk).configure(background="white").mark_boxplot(
 ).configure_axis(
@@ -72,4 +72,16 @@ box = alt.Chart(wk).configure(background="white").mark_boxplot(
     alt.Color("weekday:N").legend(None),
 )
 
-st.altair_chart(box, theme=None)
+# st.altair_chart(box, theme=None)
+
+run = df.filter(col("activity_type")=="Run").select(col("distance"), col("start_date_local")).with_columns(rolling_volume_7day=pl.col("distance").rolling_sum(7).round(2)).filter((col("rolling_volume_7day").is_not_null()))
+
+total = df.filter(col("activity_type")=="Run").select(col("distance").sum())["distance"][0]
+
+map = pl.scan_csv("map_coords.csv").with_columns(
+    color=pl.when(total>col("distance")).then(pl.lit("#07fc03")).otherwise(pl.lit("#fc0328"))).collect()
+
+st.map(map, size=5000, zoom=4, color="color")
+
+next_town = map.sql(query="select name from self where distance in (select min(distance) from self where color != '#07fc03')")
+print(town)
