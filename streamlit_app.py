@@ -2,8 +2,8 @@ import streamlit as st
 
 pages = {
     "strava anti-stats": [
-        st.Page("strava_streamlit.py", title="charts"),
-        st.Page("notes.py", title="notes"),
+        st.Page("pages/strava_streamlit.py", title="charts"),
+        st.Page("pages/notes.py", title="notes"),
     ]
 }
 

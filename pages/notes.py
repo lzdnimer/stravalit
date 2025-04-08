@@ -1,5 +1,7 @@
 import streamlit as st
 
+st.page_link("pages/strava_streamlit.py", label="back to the charts", icon="📊")
+
 lcol0, rcol0 = st.columns([0.4, 0.6], vertical_alignment="center")
 
 with lcol0:

@@ -29,6 +29,8 @@ df = get_db_data().select("*").with_columns(
     cumulative_elevation_gain=pl.col("total_elevation_gain").cum_sum(),
     month=col("start_date_local").dt.strftime("%B"))
 
+st.page_link("pages/notes.py", label="under the hood", icon="🛠️")
+
 left_img, mid_img, right_img = st.columns(3)
 with mid_img:
     st.image("strava-anti-stats-25-03-2025.png")
